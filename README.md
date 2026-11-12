@@ -55,7 +55,10 @@ Written into `OUT_DIR`:
 
 - `page.musicxml`: the reading. Part 1, staff 1 is the melody.
 - `conf.json`: one row per bar of part 1 (`bars`), in file order: `minProb`
-  (lowest probability among the symbols the model chose in that bar), `addsUp`
+  (lowest probability among the symbols the model chose in that bar),
+  `minSignProb` (lowest probability, in the model's accidental branch, of the
+  sign chosen for a note that carries one: flat, sharp, natural, half-flat,
+  half-sharp or a double; null when no note in the bar carries a sign), `addsUp`
   (true or false; null if no time signature was read; a short first or last bar
   counts as adding up), `startsStaff`, `length` and `expected` (in quarter
   notes), plus the model files' short hashes, the thread count and timings.

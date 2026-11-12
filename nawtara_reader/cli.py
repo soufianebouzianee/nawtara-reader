@@ -3,7 +3,8 @@
 
 Reads one page image (photo or scan of sheet music) and writes into OUT_DIR:
   page.musicxml   the reading (homr's MusicXML; part 1 staff 1 is the melody)
-  conf.json       per bar of part 1: lowest token probability, whether the bar adds up to the metre
+  conf.json       per bar of part 1: lowest token probability, lowest probability of an accidental
+                  sign, whether the bar adds up to the metre
 
 Model files: --models DIR or NAWTARA_READER_MODELS (a folder with encoder.onnx and
 decoder_fused.onnx); --encoder / --decoder name single files. homr's segmentation model is taken from
@@ -23,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 

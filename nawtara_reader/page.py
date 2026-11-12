@@ -9,7 +9,8 @@ onnx_loop.py. homr's sources (vendor/homr) are not edited: every change is made 
   - a run of keySign symbols becomes one key with <key-step>/<key-alter>
   - where homr's cutter joins a braced/bracketed pair of staves, the model is given the upper staff
     alone; a page of pairs where homr missed one pair is completed by spacing (split_systems)
-  - per measure of part 1: the lowest probability of the tokens the model chose
+  - per measure of part 1: the lowest probability of the tokens the model chose, and the lowest
+    accidental-branch probability among the notes that carry a sign
   - title OCR off (rapidocr is not installed), every download raises, no teaser image is written
 No PyTorch: nothing here or in homr's inference path imports it (cli.py refuses to run if it got loaded).
 """
@@ -28,6 +29,7 @@ HOMR_SRC = Path(os.environ.get("NAWTARA_READER_HOMR") or HERE.parent / "vendor")
 
 STAVES_MODE = "top"   # "merge" = homr's own joining of staff pairs (research only)
 ALTER = {"b": -1, "#": 1, "qb": -0.5, "q#": 0.5, "bb": -2, "##": 2, "N": 0}
+SIGNS = frozenset(ALTER)   # lift classes that are an accidental sign (a natural included)
 
 STAFF_KEYS = []   # key token each staff read, in reading order
 STAFFS = []       # what homr's cutter found and what was fed to the model
@@ -154,8 +156,10 @@ def setup(threads, verbose=False):
                 cs = [getattr(s, "conf", None) for s in real]
                 known = [c for c in cs if c is not None]
                 notes = [s for s in seg if s.rhythm.startswith(("note", "rest"))]
+                signs = [s.sign for s in seg if getattr(s, "sign", None) is not None]
                 rows.append(dict(
                     min=round(min(known), 4) if known else None,
+                    sign=round(min(signs), 4) if signs else None,
                     logp=round(sum(-math.log(max(c, 1e-9)) for c in known), 4),
                     low=sum(1 for c in known if c < 0.9), n=len(known), unknown=len(cs) - len(known),
                     events=len(notes),
@@ -271,6 +275,8 @@ class OnnxStaff2Score:
         for s, (r, p, l) in zip(symbols, probs):
             e = self.h.EncodedSymbol(*s)
             e.conf = min(r, p, l) if e.rhythm.startswith("note") else r
+            if e.rhythm.startswith("note") and e.lift in SIGNS:
+                e.sign = l   # how sure the model is of the sign it chose for this note
             raw.append(e)
         out = self.h.collapse_keys(raw)
         STAFF_KEYS.append(next((o.rhythm for o in out if o.rhythm.startswith("keySignature_")), None))
@@ -327,7 +333,8 @@ def bar_rows(xml_path, conf):
     out = []
     for i, (exp, got, number, new_system) in enumerate(fit):
         row = rows[i] if rows else {}
-        out.append(dict(index=i, number=number, minProb=row.get("min"), addsUp=adds_up(fit, i),
+        out.append(dict(index=i, number=number, minProb=row.get("min"),
+                        minSignProb=row.get("sign"), addsUp=adds_up(fit, i),
                         events=row.get("events"), worst=row.get("worst"),
                         startsStaff=i == 0 or new_system,
                         length=str(got), expected=None if exp is None else str(exp)))

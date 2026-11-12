@@ -77,7 +77,9 @@ imported homr modules. homr's files are not edited. Checked against the code.
     with mean 0.7931 and standard deviation 0.1738.
  3. Confidence: for each chosen symbol the probability of the top class of the
     rhythm, pitch and lift outputs is kept (the minimum of the three for notes,
-    the rhythm probability otherwise). They are only reported in conf.json.
+    the rhythm probability otherwise). For a note that carries an accidental
+    sign, the lift probability is also kept on its own (`minSignProb`). They
+    are only reported in conf.json.
  4. `LIFT_TO_ALTER` gains `qb` = -0.5 and `q#` = +0.5, so quarter tones are
     written as <alter>-0.5 / <alter>0.5 in the MusicXML.
  5. Key signatures: a run of `keySign` symbols is collapsed into one key
