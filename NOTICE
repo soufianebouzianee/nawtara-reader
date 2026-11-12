@@ -1,0 +1,110 @@
+nawtara-reader
+Copyright (C) 2026 Soufiane Bouziane (Softadev)
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License, version 3, as published by
+the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY. See the
+file LICENSE for the full text.
+
+What is in this repository
+--------------------------
+
+1. homr (vendor/homr, licence in vendor/HOMR-LICENSE)
+
+   - Project: homr, an optical music recognition program by its
+     authors and contributors. Upstream: https://github.com/liebharc/homr
+   - Version: 0.7.0 (its Changelog's latest entry; its pyproject.toml carries a
+     placeholder version, 0.1.0, set at build time).
+   - Licence: GNU Affero General Public License 3.0 (homr's pyproject.toml says
+     AGPL-3.0; its LICENSE file is vendor/HOMR-LICENSE, byte for byte as upstream,
+     including the HTML-escaped "&lt;" and "&gt;" in its copyright line).
+   - The Python files, tokenizer JSON files and everything else under
+     vendor/homr/ are an unedited copy of homr's `homr/` package. Nothing in them
+     was changed. The one thing left out is homr's segmentation model file
+     (see "Segmentation model" below).
+   - homr itself builds on the segmentation networks of oemer
+     (https://github.com/BreezeWhite/oemer) and the transformer of
+     Polyphonic-TrOMR (https://github.com/NetEase/Polyphonic-TrOMR); see homr's
+     own README for their credits.
+
+2. Ours (AGPL-3.0, same licence)
+
+   - nawtara-reader (launcher script)
+   - nawtara_reader/cli.py      the command line, output files, exit codes
+   - nawtara_reader/page.py     the changes made to homr at run time (below),
+                                and the per-bar figures written to conf.json
+   - nawtara_reader/onnx_loop.py  the staff reader: an onnxruntime decoding loop
+   - requirements.txt, README.md, NOTICE
+
+What is not in this repository
+------------------------------
+
+The trained staff model: `encoder.onnx` and `decoder_fused.onnx`. It is our own
+model, trained from the public timm ImageNet-pretrained encoder and a blank
+decoder, not from homr's transformer weights. The files are not published
+here. The command needs them: give the folder holding them in the environment
+variable NAWTARA_READER_MODELS (or with --models, or --encoder and --decoder).
+Without them the command stops with exit code 2.
+
+Segmentation model
+------------------
+
+homr 0.7.0 ships its staff-segmentation network inside its git repository as
+`homr/segmentation/segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx`
+(about 55 MB). It is not downloaded at run time in this version. Its licence is
+not stated separately: it sits in homr's AGPL-3.0 repository, and homr's README
+says its segmentation models come from oemer. We have not confirmed upstream's
+position on redistributing the weights, so we do not redistribute that file
+here. Take it from the homr repository at the
+0.7.0 release (same path) and put it in vendor/homr/segmentation/, or name your
+copy with NAWTARA_READER_SEGNET.
+
+Every change made to homr's behaviour at run time
+-------------------------------------------------
+
+All of these are made when the program starts, in nawtara_reader/page.py and
+nawtara_reader/cli.py, by replacing functions or table entries of the
+imported homr modules. homr's files are not edited. Checked against the code.
+
+ 1. Vocabulary: the lift list gains `qb` (quarter-tone flat) and `q#`
+    (quarter-tone sharp); the rhythm list gains the token `keySign`; a
+    `keySign` token counts as having a staff position.
+ 2. The staff reader: homr's `Staff2Score` model call is replaced
+    (`cli.py` sets `SPT.inference`) by `OnnxStaffReader`, which runs the model
+    on onnxruntime with greedy decoding and passes an EMPTY context after the
+    first step. homr's own loop passes one context token each step and gives
+    wrong readings with this model. The input is the staff image normalised
+    with mean 0.7931 and standard deviation 0.1738.
+ 3. Confidence: for each chosen symbol the probability of the top class of the
+    rhythm, pitch and lift outputs is kept (the minimum of the three for notes,
+    the rhythm probability otherwise). They are only reported in conf.json.
+ 4. `LIFT_TO_ALTER` gains `qb` = -0.5 and `q#` = +0.5, so quarter tones are
+    written as <alter>-0.5 / <alter>0.5 in the MusicXML.
+ 5. Key signatures: a run of `keySign` symbols is collapsed into one key
+    signature, written as <key-step>/<key-alter> pairs; a numeric code is
+    written as <fifths>; an empty one as <fifths>0. homr's `build_key` is
+    replaced for this.
+ 6. Per-bar figures: `build_measures` is wrapped to record, for every bar of
+    part 1, the lowest symbol probability. This does not change the MusicXML.
+ 7. Staff pairs (default `--staves top`): where homr's cutter joins a braced
+    or bracketed pair of staves (`Staff.merge`, `find_braces_brackets_and_grand_staff_lines`
+    are wrapped), only the UPPER staff is given to the model. On a page where
+    the number of joined pairs is at least half the number of single staves, two
+    neighbouring single staves whose gap is no wider than 1.15 times the widest
+    gap inside a joined pair are treated as a pair and their upper staff is
+    read. With `--staves merge` homr's own joining is used instead.
+ 8. Threads: onnxruntime sessions that homr opens without options (its
+    segmentation net) get the thread count given with --threads (default 2),
+    and so do OpenCV and the OMP/OpenBLAS/MKL/Accelerate thread variables.
+ 9. Network and extras: `requests` and `rapidocr` are replaced by stubs, and
+    homr's `download_file` raises, so nothing is downloaded and no title OCR is
+    possible. `detect_title` returns an empty title. The teaser image writer
+    is switched off. homr's log (which prints the whole reading) is silenced
+    unless --verbose is given.
+10. Segmentation model path: NAWTARA_READER_SEGNET, if set, overrides where
+    homr looks for its segmentation model.
+11. homr is run with its processing options all off (no debug images, no cache,
+    no staff position files, all staves, no GPU) on a link to the image placed
+    in a temporary folder inside the output folder, which is removed afterwards.
+12. The launcher and cli.py refuse to finish (exit code 4) if PyTorch got
+    imported; this program is meant to run without it.

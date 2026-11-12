@@ -1,0 +1,9 @@
+#!/bin/sh
+# nawtara-reader PAGE_IMAGE OUT_DIR   (see nawtara_reader/cli.py --help)
+# Python: NAWTARA_READER_PYTHON, else the .venv next to this file, else python3.
+here=$(cd "$(dirname "$0")" && pwd -P)
+py=${NAWTARA_READER_PYTHON:-}
+if [ -z "$py" ]; then
+  if [ -x "$here/.venv/bin/python" ]; then py="$here/.venv/bin/python"; else py=python3; fi
+fi
+exec "$py" -I "$here/nawtara_reader/cli.py" "$@"

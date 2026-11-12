@@ -1,0 +1,7 @@
+# nawtara-reader runtime (same versions as the research venv, so readings are identical)
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+Pillow==13.0.0
+musicxml==1.4
+onnxruntime==1.31.1
+typing_extensions==4.16.0
