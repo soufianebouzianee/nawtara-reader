@@ -1,9 +1,10 @@
 # nawtara-reader
 
-A command that reads one page image of sheet music, including Arabic quarter
+A command that reads page images of sheet music, including Arabic quarter
 tones (half-flats and half-sharps), and writes MusicXML.
 
     nawtara-reader PAGE_IMAGE OUT_DIR
+    nawtara-reader PAGE_IMAGE PAGE_IMAGE [...] OUT_DIR
 
 It is built on [homr](https://github.com/liebharc/homr) 0.7.0 (page layout,
 staff finding, dewarping, MusicXML writer), with a different staff model in
@@ -48,6 +49,34 @@ braced pair of staves, read the upper one (default) or use homr's own joining.
 
 Exit codes: 0 read; 2 bad arguments or a missing file; 3 the page could not be
 read (no staff found, or homr failed); 4 PyTorch was loaded.
+
+## Several pages in one run
+
+    ./nawtara-reader page1.jpg page2.jpg page3.jpg out/
+
+The models are loaded once and the pages are read one after the other, in the
+order given. For the Nth page (`001`, `002`, ...) `OUT_DIR` gets:
+
+- `page-N.musicxml` and `conf-N.json`: the same two files as for one page,
+  with the same content a run on that page alone would write (apart from the
+  seconds). `conf-N.json` is written last, so a page is complete once it
+  exists.
+- or `page-N.error`: one line saying why the page was not read (no staff
+  found, the image file is missing, homr failed). The run goes on with the
+  next page.
+
+Exit code 0 when every page was read, 3 when at least one was not (2 for bad
+arguments or missing model files, 4 if PyTorch was loaded, as for one page). A
+page with none of the three files was not reached: the run stopped before it.
+
+Each page is read on its own. Nothing is carried from one page to the next:
+a page with no printed time signature has none in its file,
+and repeats are not matched across pages. Joining the pages is the caller's
+work. Files of the same names left by an earlier run are removed first; files
+with other numbers are not, so give each run its own folder.
+
+In `conf-N.json`, `seconds.total` is that page alone and `seconds.load` the
+one model load of the run (the same figure on every page).
 
 ## Output files
 

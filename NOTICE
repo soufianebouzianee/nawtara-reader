@@ -110,3 +110,7 @@ imported homr modules. homr's files are not edited. Checked against the code.
     in a temporary folder inside the output folder, which is removed afterwards.
 12. The launcher and cli.py refuse to finish (exit code 4) if PyTorch got
     imported; this program is meant to run without it.
+13. Several pages in one run: homr opens a new session of its segmentation
+    net for every page (`Segnet` in homr/segmentation/inference_segnet.py);
+    the first session is kept and used for every page of the run. Each page
+    is still handed to homr on its own, as in 11.
