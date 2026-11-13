@@ -12,6 +12,7 @@ onnx_loop.py. homr's sources (vendor/homr) are not edited: every change is made 
   - per measure of part 1: the lowest probability of the tokens the model chose, and the lowest
     accidental-branch probability among the notes that carry a sign
   - title OCR off (rapidocr is not installed), every download raises, no teaser image is written
+  - homr's segmentation session is opened once and kept, so a run of several pages loads it once
 No PyTorch: nothing here or in homr's inference path imports it (cli.py refuses to run if it got loaded).
 """
 import json
@@ -91,6 +92,14 @@ def setup(threads, verbose=False):
     segnet = os.environ.get("NAWTARA_READER_SEGNET")
     if segnet:
         SEG.segnet_path_onnx = segnet
+
+    # homr opens its segmentation session anew for every page: the first one is kept for the run
+    _Segnet, kept = SEG.Segnet, {}
+    def keep_segnet(use_gpu_inference):
+        if use_gpu_inference not in kept:
+            kept[use_gpu_inference] = _Segnet(use_gpu_inference)
+        return kept[use_gpu_inference]
+    SEG.Segnet = keep_segnet
 
     G.LIFT_TO_ALTER.update({"qb": -0.5, "q#": 0.5})
 
@@ -239,6 +248,12 @@ def setup(threads, verbose=False):
 
     return types.SimpleNamespace(M=M, G=G, SPT=SPT, Config=Config, EncodedSymbol=EncodedSymbol,
                                  collapse_keys=collapse_keys)
+
+
+def reset():
+    """Forget the last page (the lists above): call before each page of a run of several."""
+    for kept in (STAFF_KEYS, STAFFS, MEASURES, STAFF_SECONDS):
+        kept.clear()
 
 
 def _blocked(*a, **k):
