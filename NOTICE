@@ -123,3 +123,11 @@ imported homr modules. homr's files are not edited. Checked against the code.
     (homr.music_xml_generator). The decoder session is wrapped to keep its
     `attention` output, and the staff reader's `predict` to tag each symbol
     with its staff. Nothing in page.musicxml or conf.json depends on it.
+15. Time signatures read (0.4.0): homr's clean-up of a staff's symbols
+    (`remove_duplicated_symbols`, as homr.staff_parsing calls it) is wrapped.
+    homr's own result is what the rest of the program gets, unchanged. On a
+    copy of the symbols taken before it, the clean-up is run a second time
+    with one rule changed: a time signature equal to the last one kept is
+    kept and marked instead of removed. The bars of that copy are counted
+    the way homr's writer counts them, and every time signature of part 1 is
+    reported in conf.json (`signatures`). page.musicxml does not change.

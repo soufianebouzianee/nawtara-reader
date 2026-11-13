@@ -5,7 +5,8 @@ nawtara-reader PAGE_IMAGE PAGE_IMAGE [...] OUT_DIR
 Reads one page image (photo or scan of sheet music) and writes into OUT_DIR:
   page.musicxml   the reading (homr's MusicXML; part 1 staff 1 is the melody)
   conf.json       per bar of part 1: lowest token probability, lowest probability of an accidental
-                  sign, whether the bar adds up to the metre
+                  sign, whether the bar adds up to the metre; "signatures": every time signature the
+                  model read on part 1 (bar, staff, lower figure), the ones page.musicxml leaves out too
   layout.json     where each bar of part 1 is on the image (nawtara_reader/layout.py); absent when
                   it could not be worked out
 
@@ -36,7 +37,7 @@ import threading
 import time
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
@@ -111,12 +112,22 @@ def write_conf(P, out, xml_name, conf_name, a, models, seconds):
         measures=conf["measures"] if conf else len(bars),
         segments=conf["segments"] if conf else None,
         bars=bars,
+        signatures=signatures(P, out / xml_name),
         rows=conf["rows"] if conf else None,
         seconds=seconds(),
     )
     tmp = out / (conf_name + ".tmp")
     tmp.write_text(json.dumps(doc))
     tmp.replace(out / conf_name)
+
+
+def signatures(P, xml_path):
+    """conf.json "signatures" (page.signature_rows); None when they could not be placed. Never fails
+    the page: the MusicXML is the reading, this list only says where signatures were seen."""
+    try:
+        return P.signature_rows(xml_path)
+    except Exception:
+        return None
 
 
 def one_line(text, limit=300):

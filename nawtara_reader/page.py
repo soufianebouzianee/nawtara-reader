@@ -13,8 +13,12 @@ onnx_loop.py. homr's sources (vendor/homr) are not edited: every change is made 
     accidental-branch probability among the notes that carry a sign
   - title OCR off (rapidocr is not installed), every download raises, no teaser image is written
   - homr's segmentation session is opened once and kept, so a run of several pages loads it once
+  - every time-signature token the model read on part 1 is kept with its bar and staff, also the
+    ones homr's clean-up drops as a repeat of the last (signatures_read; conf.json "signatures").
+    It is worked out on a copy of the tokens: what homr writes is not changed
 No PyTorch: nothing here or in homr's inference path imports it (cli.py refuses to run if it got loaded).
 """
+import copy
 import json
 import math
 import os
@@ -35,6 +39,7 @@ SIGNS = frozenset(ALTER)   # lift classes that are an accidental sign (a natural
 STAFF_KEYS = []   # key token each staff read, in reading order
 STAFFS = []       # what homr's cutter found and what was fed to the model
 MEASURES = []     # per-measure confidence rows of part 1
+SIGNATURES = []   # [rows] of the first voice: every time-signature token read (signatures_read)
 STAFF_SECONDS = []
 
 
@@ -181,6 +186,20 @@ def setup(threads, verbose=False):
         return measures
     G.build_measures = build_measures
 
+    # ---- every time signature read, the repeated ones too --------------------------------------
+    import homr.staff_parsing as SP
+    _dedup = SP.remove_duplicated_symbols
+    def remove_duplicated_symbols(symbols, cleanup_tuplets=True):
+        copied = copy.deepcopy(symbols)   # before homr's pass: it may change symbols in place
+        out = _dedup(symbols, cleanup_tuplets)
+        if not SIGNATURES:   # the first voice is part 1
+            try:
+                SIGNATURES.append(signatures_read(V, copied, out, cleanup_tuplets))
+            except Exception:
+                SIGNATURES.append(None)
+        return out
+    SP.remove_duplicated_symbols = remove_duplicated_symbols
+
     # ---- one staff at a time where homr joins a pair ------------------------------------------
     _merge = HM.Staff.merge
     def merge(self, other):
@@ -250,9 +269,83 @@ def setup(threads, verbose=False):
                                  collapse_keys=collapse_keys)
 
 
+def signatures_read(V, symbols, out, cleanup_tuplets=True):
+    """Every time-signature token in homr's clean-up of one voice, with the measure it falls in.
+
+    homr's clean-up (vocabulary.remove_duplicated_symbols) drops a time signature equal to the last
+    one kept: 4/4 then 3/4 are both "timeSignature/4" for this model, so the second goes. Here the
+    clean-up is run again on a copy with that one rule changed (the token is kept and marked), and
+    the measures are counted as homr's writer counts them (build_measures). Returns a list of
+    dict(bar, line, lowerFigure, prob, startsLine, atBarStart, kept), or None when the copy's tokens,
+    marked ones left out, are not the tokens homr wrote."""
+    original = V._remove_redudant_clefs_keys_and_time_signatures
+
+    def keep_and_mark(chords):
+        time = ""
+        for chord in chords:
+            for symbol in chord:
+                if symbol.rhythm.startswith("timeSignature"):
+                    if symbol.rhythm == time:
+                        symbol._dropped = True
+                    time = symbol.rhythm
+        # homr's own rule on the rest; it only removes symbols, so what it kept is found by identity
+        result = original([[s for s in chord if not getattr(s, "_dropped", False)] for chord in chords])
+        kept = {id(s) for chord in result for s in chord}
+        return [[s for s in chord if getattr(s, "_dropped", False) or id(s) in kept] for chord in chords]
+
+    V._remove_redudant_clefs_keys_and_time_signatures = keep_and_mark
+    try:
+        full = V.remove_duplicated_symbols(symbols, cleanup_tuplets)
+    finally:
+        V._remove_redudant_clefs_keys_and_time_signatures = original
+
+    def plain(seq):
+        return [str(s) for s in seq if s.rhythm != "chord"]
+    if plain([s for s in full if not getattr(s, "_dropped", False)]) != plain(out):
+        return None
+
+    rows, bar, line, note_in_bar, note_in_line = [], 0, 1, False, False
+    for chord in V.sort_token_chords(full):
+        for s in chord:
+            if s.rhythm.startswith("timeSignature"):
+                conf = getattr(s, "conf", None)
+                rows.append(dict(bar=bar, line=line, lowerFigure=s.rhythm.split("/", 1)[1],
+                                 prob=None if conf is None else round(float(conf), 4),
+                                 startsLine=not note_in_line, atBarStart=not note_in_bar,
+                                 kept=not getattr(s, "_dropped", False)))
+        r = chord[0].rhythm
+        if r.startswith(("note", "rest")):
+            note_in_bar = note_in_line = True
+        elif r == "newline":
+            line += 1
+            note_in_line = False
+        elif "barline" in r or r in ("repeatStart", "repeatEnd", "repeatEndStart"):
+            bar += 1
+            note_in_bar = False
+    return rows
+
+
+def signature_rows(xml_path):
+    """conf.json "signatures": every time signature the model read on part 1, each with the bar it
+    opens (index into "bars"), the staff it was read on (from 1, in reading order), its lower figure,
+    the model's probability, and whether page.musicxml states it ("inFile"; homr's writer drops one
+    whose lower figure is the same as the last). None when they could not be placed."""
+    rows = SIGNATURES[0] if SIGNATURES else None
+    if rows is None:
+        return None
+    part = ET.parse(xml_path).getroot().find("part")
+    stated = [m.find("attributes/time") is not None for m in part.findall("measure")]
+    out = []
+    for r in rows:
+        in_file = r["kept"] and r["bar"] < len(stated) and stated[r["bar"]]
+        out.append(dict(bar=r["bar"], staff=r["line"], lowerFigure=r["lowerFigure"], prob=r["prob"],
+                        startsStaff=r["startsLine"], atBarStart=r["atBarStart"], inFile=bool(in_file)))
+    return out
+
+
 def reset():
     """Forget the last page (the lists above): call before each page of a run of several."""
-    for kept in (STAFF_KEYS, STAFFS, MEASURES, STAFF_SECONDS):
+    for kept in (STAFF_KEYS, STAFFS, MEASURES, STAFF_SECONDS, SIGNATURES):
         kept.clear()
 
 

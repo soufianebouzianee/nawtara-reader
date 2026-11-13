@@ -92,6 +92,15 @@ Written into `OUT_DIR`:
   (true or false; null if no time signature was read; a short first or last bar
   counts as adding up), `startsStaff`, `length` and `expected` (in quarter
   notes), plus the model files' short hashes, the thread count and timings.
+  `signatures` (from 0.4.0): every time signature the model read on part 1,
+  in reading order: `bar` (the bar it opens, an index into `bars`), `staff`
+  (the staff it was read on, from 1, top to bottom), `lowerFigure`, `prob`
+  (the model's probability), `startsStaff`, `atBarStart` and `inFile`. The
+  model reads only the lower figure of a time signature, and the MusicXML
+  writer states one only where that figure changes, so a signature read with
+  the same lower figure as the last (3/4 after 4/4) has `inFile` false: it is
+  not in `page.musicxml`, but it was seen there. `signatures` is null when
+  the signatures could not be placed on bars.
 - `layout.json`: where each bar is on the image. `page` is the image's size in
   pixels, upright (EXIF orientation applied). `staves`: each staff read, with
   its `box` `[x0, y0, x1, y1]` in those pixels and the bars on it. `bars`: one
