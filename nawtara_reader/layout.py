@@ -279,16 +279,17 @@ def ink_profile(image, grid, unit):
     is dark all the way; a stem rarely is, and a note head never. The page may lean a little, so a
     row counts as dark when the column or one of its two neighbours is."""
     import numpy as np
-    gray = image if image.ndim == 2 else image[:, :, :3].mean(axis=2)
     x0, x1 = int(round(grid[0][0])), int(round(grid[-1][0]))
-    x0, x1 = max(1, x0), min(gray.shape[1] - 2, x1)
+    x0, x1 = max(1, x0), min(image.shape[1] - 2, x1)
     if x1 <= x0:
         return dict(x0=x0, values=[])
-    tops = [_at(grid, x, 1) for x in range(x0, x1 + 1)]
-    bottoms = [_at(grid, x, 2) for x in range(x0, x1 + 1)]
-    ya = max(0, int(min(tops) - 2 * unit))
-    yb = min(gray.shape[0], int(max(bottoms) + 2 * unit) + 1)
-    strip = gray[ya:yb, x0 - 1:x1 + 2].astype(np.float32)
+    xs, gx = np.arange(x0, x1 + 1), [g[0] for g in grid]
+    tops = np.interp(xs, gx, [g[1] for g in grid])
+    bottoms = np.interp(xs, gx, [g[2] for g in grid])
+    ya = max(0, int(tops.min() - 2 * unit))
+    yb = min(image.shape[0], int(bottoms.max() + 2 * unit) + 1)
+    strip = image[ya:yb, x0 - 1:x1 + 2]
+    strip = (strip if strip.ndim == 2 else strip[:, :, :3].mean(axis=2)).astype(np.float32)
     # dark = clearly darker than the paper around it (the paper's shade drifts across a photo)
     paper = np.percentile(strip, 80, axis=0)
     kernel = max(3, int(4 * unit) | 1)
