@@ -489,16 +489,16 @@ def build(raw):
     aligned = len(segs) == meas["count"]
     bars = []
     for i in range(meas["count"]):
-        row = dict(index=i, staff=None, box=None, left=None, right=None, sure=False)
+        row = dict(index=i, staff=None, box=None, trust=None, left=None, right=None)
         bars.append(row)
         seg = segs[i] if aligned else None
         if not seg:
             continue
         on = {int(k): v for k, v in seg["staves"].items()}
         if not on:
-            continue   # nothing in it: the server drops such a bar, and it has no place of its own
-        n = min(on)    # a bar that runs over a line break is shown where it starts
-        staff, plan = staves_raw[n], plans[n]
+            continue   # nothing in it: it has no place of its own (the server drops such a bar)
+        n = min(on)    # a bar that runs over a line break is shown on the staff where it starts
+        staff = staves_raw[n]
         grid = staff["grid"]
         left = right = None
         if seg["open"] and seg["open"][0] == n:
@@ -509,21 +509,24 @@ def build(raw):
             right = where.get(tuple(seg["close"]))
         elif i + 1 < len(segs) and segs[i + 1]["open"] and segs[i + 1]["open"][0] == n:
             right = where.get(tuple(segs[i + 1]["open"]))
-        if len(on) > 1:
-            right = None
         xa, how_a = (grid[0][0], "staff") if left is None or left["kind"] != "inner" else (left["x"], left["how"])
         xb, how_b = (grid[-1][0], "staff") if right is None or right["kind"] != "inner" else (right["x"], right["how"])
-        if xb <= xa:
-            continue
-        row.update(staff=n, box=band(staff, xa, xb), left=how_a, right=how_b,
-                   sure=how_a in SURE and how_b in SURE and len(on) == 1)
+        hows = (how_a, how_b)
+        if len(on) > 1 or xb <= xa or "share" in hows:
+            trust = "staff"
+        elif "between" in hows:
+            trust = "near"
+        else:
+            trust = "bar"
+        if trust == "staff":
+            xa, xb = grid[0][0], grid[-1][0]
+        row.update(staff=n, box=band(staff, xa, xb), trust=trust, left=how_a, right=how_b)
         if len(on) > 1:
             row["overLineBreak"] = True
-        # the widest the bar can be when an edge is only known to lie between two note heads
-        if "between" in (how_a, how_b):
-            wa = left["lo"] if how_a == "between" else xa
-            wb = right["hi"] if how_b == "between" else xb
-            row["reach"] = band(staff, wa, wb)
+        if trust == "near":
+            # the widest the bar can be: out to the note head an unsure edge lies before or after
+            row["reach"] = band(staff, left["lo"] if how_a == "between" else xa,
+                                right["hi"] if how_b == "between" else xb)
     staves = []
     for n, (staff, plan) in enumerate(zip(staves_raw, plans)):
         grid = staff["grid"]
@@ -539,6 +542,7 @@ def write(path, xml_path=None, version=None):
     """Write layout.json for the page just read. Never raises: a page whose layout cannot be worked
     out has no layout.json, and its reading is not touched."""
     try:
+        path.unlink(missing_ok=True)
         doc = build(RAW)
         if doc is None:
             return False
