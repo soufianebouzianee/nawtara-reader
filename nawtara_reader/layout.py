@@ -41,6 +41,9 @@ def reset():
 def _view_offset(whole, part):
     """(x, y) of `part` inside `whole` when it is a view of it, else (0, 0)."""
     try:
+        import numpy as np
+        if not np.shares_memory(whole, part):
+            return 0, 0
         a, b = whole.__array_interface__["data"][0], part.__array_interface__["data"][0]
         row = whole.strides[0]
         off = b - a
@@ -262,6 +265,7 @@ TAIL = 2.0          # a stroke this close to the staff's right end is the staff'
 COVER = 0.7         # a bar line covers at least this much of the staff's height
 HEAD_COLUMN = 0.8   # note heads closer than this in x are one chord
 BRACKET_SLACK = 0.5
+HEADS_OFF = 2       # note heads seen and notes read may differ by this many on a staff
 SURE = ("staff", "line", "ink")
 
 
@@ -392,7 +396,9 @@ def place_staff(staff, bar_lines):
                stroke between those two note heads (`strokes_between`)
       between  no stroke to take: the place is only known to lie between two note heads
                (`lo`, `hi`); x is their middle
-      share    neither: x is the place's share of the staff by the count of notes and rests
+      share    neither (homr's note heads and the model's notes disagree, and no single stroke
+               stands where the place should be): x is the place's share of the staff by the count
+               of notes and rests; a bar with such an edge is given its staff's box
     Places before the first note or rest (`lead`) and after the last (`trail`) are the staff's ends.
     """
     grid, u = staff["grid"], staff["unit"]
@@ -409,45 +415,62 @@ def place_staff(staff, bar_lines):
     columns = [sum(c) / len(c) for c in columns]
     heads_agree = bool(columns) and len(columns) == onsets
 
-    want = [g for g in groups if g["before"] and g["after"]]
-    lead = [g for g in groups if not g["before"]]
     for g in groups:
         g["kind"] = "lead" if not g["before"] else "trail" if not g["after"] else "inner"
-    # a start-repeat before the first note is a stroke of its own, right of the clef and key
-    lead_stroke = bool(lead) and any(staff["symbols"][s][0] == "repeatStart" for s in lead[0]["steps"])
-    first = columns[0] if columns else None
-    if lead_stroke and inner and first is not None and inner[0] < first and len(inner) == len(want) + 1:
-        lead[0]["x"], lead[0]["how"] = inner[0], "line"
-        inner = inner[1:]
-    elif lead_stroke and inner and first is not None and inner[0] < first - u and len(inner) > len(want):
-        inner = inner[1:]
+    want = [g for g in groups if g["kind"] == "inner"]
+    # A stroke left of the first note head is no bar line when the model wrote a note before its
+    # first bar line: it is the start-repeat after the clef (or a stroke of the clef or the time).
+    # The same on the right of the last head.
+    if want and columns:
+        if want[0]["headsBefore"] > 0:
+            inner = [x for x in inner if x >= columns[0]]
+        if onsets - want[-1]["headsBefore"] > 0:
+            inner = [x for x in inner if x <= columns[-1]]
 
+    # Each place lies between two note heads: the last of the bar before and the first of the bar
+    # after. When homr saw one or two heads more or fewer than the model wrote, the two heads are
+    # only known to within that many, and the gap is taken that much wider (`loose`).
+    off = abs(len(columns) - onsets)
+    loose = 0 < off <= HEADS_OFF and len(columns) >= 4
     for g in want:
-        if heads_agree and 0 < g["headsBefore"] < len(columns):
-            g["lo"], g["hi"] = columns[g["headsBefore"] - 1], columns[g["headsBefore"]]
+        k = g["headsBefore"]
+        if heads_agree and 0 < k < len(columns):
+            g["lo"], g["hi"] = columns[k - 1], columns[k]
+        elif loose and 0 < k < onsets:
+            g["wlo"] = columns[max(0, min(len(columns) - 1, k - 1 - off))]
+            g["whi"] = columns[max(0, min(len(columns) - 1, k + off))]
+
+    def inside(g, lo, hi):
+        return [x for x in inner if lo - BRACKET_SLACK * u <= x <= hi + BRACKET_SLACK * u]
+
     if len(inner) == len(want):
         for g, x in zip(want, inner):
             g["x"], g["how"] = x, "line"
-            if "lo" in g and not g["lo"] - BRACKET_SLACK * u <= x <= g["hi"] + BRACKET_SLACK * u:
-                g["how"] = "line?"   # in order, but not between the heads it should be between
+            if "lo" in g and not inside(g, g["lo"], g["hi"]).count(x):
+                g["how"] = "line?"   # in order, but not between the two heads it should be between
     else:
+        first = columns[0] if columns else None
         for g in want:
             if "lo" in g:
-                inside = [x for x in inner if g["lo"] - BRACKET_SLACK * u <= x <= g["hi"] + BRACKET_SLACK * u]
-                own = strokes_between(staff, g["lo"], g["hi"]) if len(inside) != 1 else []
-                if len(inside) == 1:
-                    g["x"], g["how"] = inside[0], "line"
+                seen = inside(g, g["lo"], g["hi"])
+                own = strokes_between(staff, g["lo"], g["hi"]) if len(seen) != 1 else []
+                if len(seen) == 1:
+                    g["x"], g["how"] = seen[0], "line"
                 elif len(own) == 1:
                     g["x"], g["how"] = own[0], "ink"
                 else:
                     g["x"], g["how"] = (g["lo"] + g["hi"]) / 2, "between"
+                continue
+            seen = inside(g, g["wlo"], g["whi"]) if "wlo" in g else []
+            if len(seen) == 1:
+                g["x"], g["how"] = seen[0], "line"
             else:
                 start = (first - 1.5 * u) if first is not None else x0 + 6 * u
                 g["x"], g["how"] = start + (x1 - start) * g["before"] / max(events, 1), "share"
-        # a place must not come before the one on its left
+        # a place cannot come before the one on its left, nor two places take one stroke
         last = None
         for g in want:
-            if last is not None and g["x"] < last["x"]:
+            if last is not None and g["x"] <= last["x"]:
                 g["how"] = last["how"] = "share"
             last = g
     return dict(groups=groups, strokes=len(strokes), inner=len(inner), wanted=len(want),

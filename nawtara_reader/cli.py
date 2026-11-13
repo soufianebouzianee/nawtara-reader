@@ -5,6 +5,8 @@ Reads one page image (photo or scan of sheet music) and writes into OUT_DIR:
   page.musicxml   the reading (homr's MusicXML; part 1 staff 1 is the melody)
   conf.json       per bar of part 1: lowest token probability, lowest probability of an accidental
                   sign, whether the bar adds up to the metre
+  layout.json     where each bar of part 1 is on the image (nawtara_reader/layout.py); absent when
+                  it could not be worked out
 
 Model files: --models DIR or NAWTARA_READER_MODELS (a folder with encoder.onnx and
 decoder_fused.onnx); --encoder / --decoder name single files. homr's segmentation model is taken from

@@ -62,6 +62,16 @@ Written into `OUT_DIR`:
   (true or false; null if no time signature was read; a short first or last bar
   counts as adding up), `startsStaff`, `length` and `expected` (in quarter
   notes), plus the model files' short hashes, the thread count and timings.
+- `layout.json`: where each bar is on the image. `page` is the image's size in
+  pixels, upright (EXIF orientation applied). `staves`: each staff read, with
+  its `box` `[x0, y0, x1, y1]` in those pixels and the bars on it. `bars`: one
+  row per bar of part 1, in file order like `conf.json`: `staff`, `box` (the
+  staff's five lines between the bar's two bar lines) and `trust`: `bar` (both
+  edges are the staff's end or a bar line found on the page), `near` (an edge
+  is only known to lie between two note heads; `reach` is the widest the bar
+  can be) or `staff` (no edge found: `box` is the whole staff). A bar with
+  nothing in it has no box. The file is not written when the layout could not
+  be worked out; `page.musicxml` and `conf.json` never depend on it.
 
 ## Reading the MusicXML
 

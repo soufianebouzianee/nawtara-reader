@@ -34,6 +34,7 @@ What is in this repository
    - nawtara_reader/page.py     the changes made to homr at run time (below),
                                 and the per-bar figures written to conf.json
    - nawtara_reader/onnx_loop.py  the staff reader: an onnxruntime decoding loop
+   - nawtara_reader/layout.py   where each bar is on the page image (layout.json)
    - requirements.txt, README.md, NOTICE
 
 What is not in this repository
@@ -110,3 +111,11 @@ imported homr modules. homr's files are not edited. Checked against the code.
     in a temporary folder inside the output folder, which is removed afterwards.
 12. The launcher and cli.py refuse to finish (exit code 4) if PyTorch got
     imported; this program is meant to run without it.
+13. Bar positions (nawtara_reader/layout.py): these homr functions are wrapped
+    to record what they are given and what they return, and hand every value
+    through unchanged: `autocrop` and `detect_bar_lines` (homr.main),
+    `prepare_staff_image`, `crop_image_and_return_new_top` and
+    `center_image_on_canvas` (homr.staff_parsing), `build_measures`
+    (homr.music_xml_generator). The decoder session is wrapped to keep its
+    `attention` output, and the staff reader's `predict` to tag each symbol
+    with its staff. Nothing in page.musicxml or conf.json depends on it.
