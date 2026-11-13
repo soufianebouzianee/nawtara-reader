@@ -61,7 +61,7 @@ def main(argv=None):
             print(f"nawtara-reader: {what} not found: {f}", file=sys.stderr)
             return 2
     out.mkdir(parents=True, exist_ok=True)
-    for name in ("page.musicxml", "conf.json"):
+    for name in ("page.musicxml", "conf.json", "layout.json"):
         (out / name).unlink(missing_ok=True)
 
     t0 = time.perf_counter()
@@ -70,6 +70,8 @@ def main(argv=None):
     h = P.setup(a.threads, a.verbose)
     dump = [] if a.dump_tensors else None
     h.SPT.inference = P.OnnxStaff2Score(h, encoder, decoder, a.threads, dump)
+    from nawtara_reader import layout as L   # where each bar is on the page (layout.json); listens only
+    L.install(h, h.SPT.inference)
     t_load = time.perf_counter() - t0
 
     # homr writes next to the image it is given: hand it a link in a private folder
@@ -121,6 +123,7 @@ def main(argv=None):
     tmp = out / "conf.json.tmp"
     tmp.write_text(json.dumps(doc))
     tmp.replace(out / "conf.json")
+    L.write(out / "layout.json", out / "page.musicxml", VERSION)
     return 0
 
 
