@@ -34,6 +34,7 @@ What is in this repository
    - nawtara_reader/page.py     the changes made to homr at run time (below),
                                 and the per-bar figures written to conf.json
    - nawtara_reader/onnx_loop.py  the staff reader: an onnxruntime decoding loop
+   - nawtara_reader/layout.py   where each bar is on the page image (layout.json)
    - requirements.txt, README.md, NOTICE
 
 What is not in this repository
@@ -114,3 +115,11 @@ imported homr modules. homr's files are not edited. Checked against the code.
     net for every page (`Segnet` in homr/segmentation/inference_segnet.py);
     the first session is kept and used for every page of the run. Each page
     is still handed to homr on its own, as in 11.
+14. Bar positions (nawtara_reader/layout.py): these homr functions are wrapped
+    to record what they are given and what they return, and hand every value
+    through unchanged: `autocrop` and `detect_bar_lines` (homr.main),
+    `prepare_staff_image`, `crop_image_and_return_new_top` and
+    `center_image_on_canvas` (homr.staff_parsing), `build_measures`
+    (homr.music_xml_generator). The decoder session is wrapped to keep its
+    `attention` output, and the staff reader's `predict` to tag each symbol
+    with its staff. Nothing in page.musicxml or conf.json depends on it.

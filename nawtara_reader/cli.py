@@ -6,12 +6,14 @@ Reads one page image (photo or scan of sheet music) and writes into OUT_DIR:
   page.musicxml   the reading (homr's MusicXML; part 1 staff 1 is the melody)
   conf.json       per bar of part 1: lowest token probability, lowest probability of an accidental
                   sign, whether the bar adds up to the metre
+  layout.json     where each bar of part 1 is on the image (nawtara_reader/layout.py); absent when
+                  it could not be worked out
 
 Given several page images, it reads them one after the other in the order given, with the models
 loaded once, and writes for the Nth page (N = 001, 002, ...):
-  page-N.musicxml and conf-N.json   the same two files as for one page, or
-  page-N.error                      one line saying why that page was not read; the run goes on
-conf-N.json is written last, so a page is complete once it exists. Each page is read on its own:
+  page-N.musicxml, conf-N.json and layout-N.json   the same files as for one page, or
+  page-N.error                                     one line saying why that page was not read; the run goes on
+conf-N.json is written last (after layout-N.json, when there is one), so a page is complete once it exists. Each page is read on its own:
 nothing (key, metre, repeats) is carried from one page to the next.
 
 Model files: --models DIR or NAWTARA_READER_MODELS (a folder with encoder.onnx and
@@ -156,10 +158,10 @@ def main(argv=None):
             return 2
     out.mkdir(parents=True, exist_ok=True)
     if several:
-        names = [(f"page-{n:03d}.musicxml", f"conf-{n:03d}.json", f"page-{n:03d}.error")
+        names = [(f"page-{n:03d}.musicxml", f"conf-{n:03d}.json", f"page-{n:03d}.error", f"layout-{n:03d}.json")
                  for n in range(1, len(images) + 1)]
     else:
-        names = [("page.musicxml", "conf.json", None)]
+        names = [("page.musicxml", "conf.json", None, "layout.json")]
     for group in names:
         for name in group:
             if name:
@@ -172,10 +174,12 @@ def main(argv=None):
     h = P.setup(a.threads, a.verbose)
     dump = [] if a.dump_tensors else None
     h.SPT.inference = P.OnnxStaff2Score(h, encoder, decoder, a.threads, dump)
+    from nawtara_reader import layout as L   # where each bar is on the page (layout.json); listens only
+    L.install(h, h.SPT.inference)
     t_load = time.perf_counter() - t0
 
     if not several:
-        xml_name, conf_name, _ = names[0]
+        xml_name, conf_name, _, layout_name = names[0]
         code, message = read_page(h, images[0], out, xml_name)
         if code:
             print(f"nawtara-reader: {message}", file=sys.stderr)
@@ -183,21 +187,24 @@ def main(argv=None):
         if dump is not None:
             import numpy as np
             np.savez(a.dump_tensors, **{f"staff{i}": x for i, x in enumerate(dump)})
+        L.write(out / layout_name, out / xml_name, VERSION)   # never an error: no file when not worked out
         write_conf(P, out, xml_name, conf_name, a, models(), lambda: dict(
             total=round(time.perf_counter() - t0, 2), load=round(t_load, 2), staves=P.STAFF_SECONDS))
         return 0
 
     # several pages: each on its own, a failure is written down and the run goes on
     failed = 0
-    for n, (image, (xml_name, conf_name, error_name)) in enumerate(zip(images, names), 1):
+    for n, (image, (xml_name, conf_name, error_name, layout_name)) in enumerate(zip(images, names), 1):
         t_page = time.perf_counter()
         P.reset()
+        L.reset()
         try:
             if not image.is_file():
                 code, message = 2, f"page image not found: {image}"
             else:
                 code, message = read_page(h, image, out, xml_name)
             if code == 0:
+                L.write(out / layout_name, out / xml_name, VERSION)
                 # total: this page alone; load: the one load of the run, the same figure on every page
                 write_conf(P, out, xml_name, conf_name, a, models(), lambda: dict(
                     total=round(time.perf_counter() - t_page, 2), load=round(t_load, 2), staves=P.STAFF_SECONDS))
@@ -206,6 +213,7 @@ def main(argv=None):
         if code:
             failed += 1
             (out / xml_name).unlink(missing_ok=True)
+            (out / layout_name).unlink(missing_ok=True)
             (out / error_name).write_text(one_line(message) + "\n")
             print(f"nawtara-reader: page {n}: {one_line(message)}", file=sys.stderr)
             if code == 4:

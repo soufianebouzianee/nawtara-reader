@@ -57,17 +57,18 @@ read (no staff found, or homr failed); 4 PyTorch was loaded.
 The models are loaded once and the pages are read one after the other, in the
 order given. For the Nth page (`001`, `002`, ...) `OUT_DIR` gets:
 
-- `page-N.musicxml` and `conf-N.json`: the same two files as for one page,
-  with the same content a run on that page alone would write (apart from the
-  seconds). `conf-N.json` is written last, so a page is complete once it
-  exists.
+- `page-N.musicxml`, `conf-N.json` and `layout-N.json`: the same files as for
+  one page, with the same content a run on that page alone would write (apart
+  from the seconds). `layout-N.json` is missing when the layout could not be
+  worked out; the page still counts as read. `conf-N.json` is written last,
+  after the layout, so a page is complete once its conf exists.
 - or `page-N.error`: one line saying why the page was not read (no staff
   found, the image file is missing, homr failed). The run goes on with the
   next page.
 
 Exit code 0 when every page was read, 3 when at least one was not (2 for bad
 arguments or missing model files, 4 if PyTorch was loaded, as for one page). A
-page with none of the three files was not reached: the run stopped before it.
+page with neither a conf nor an error file was not reached: the run stopped before it.
 
 Each page is read on its own. Nothing is carried from one page to the next:
 a page with no printed time signature has none in its file,
@@ -91,6 +92,16 @@ Written into `OUT_DIR`:
   (true or false; null if no time signature was read; a short first or last bar
   counts as adding up), `startsStaff`, `length` and `expected` (in quarter
   notes), plus the model files' short hashes, the thread count and timings.
+- `layout.json`: where each bar is on the image. `page` is the image's size in
+  pixels, upright (EXIF orientation applied). `staves`: each staff read, with
+  its `box` `[x0, y0, x1, y1]` in those pixels and the bars on it. `bars`: one
+  row per bar of part 1, in file order like `conf.json`: `staff`, `box` (the
+  staff's five lines between the bar's two bar lines) and `trust`: `bar` (both
+  edges are the staff's end or a bar line found on the page), `near` (an edge
+  is only known to lie between two note heads; `reach` is the widest the bar
+  can be) or `staff` (no edge found: `box` is the whole staff). A bar with
+  nothing in it has no box. The file is not written when the layout could not
+  be worked out; `page.musicxml` and `conf.json` never depend on it.
 
 ## Reading the MusicXML
 
