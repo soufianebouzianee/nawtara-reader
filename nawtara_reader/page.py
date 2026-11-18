@@ -147,6 +147,14 @@ def setup(threads, verbose=False):
         return out
 
     # ---- per-measure confidence of part 1 -----------------------------------------------------
+    def note_row(s):
+        """One note of the bar, in reading order (chord notes included): its pitch, the lift the
+        model chose and that lift's probability, and every other lift it gave at least
+        onnx_loop.LIFT_FLOOR."""
+        lifts = getattr(s, "lifts", None) or {}
+        return dict(pitch=s.pitch, lift=s.lift, p=round(lifts.get(s.lift, 0.0), 4),
+                    alts={k: round(v, 4) for k, v in sorted(lifts.items(), key=lambda kv: -kv[1]) if k != s.lift})
+
     _build_measures = G.build_measures
     def build_measures(args, voice, is_first_part, has_two_staves=False):
         measures = _build_measures(args, voice, is_first_part, has_two_staves)
@@ -178,7 +186,8 @@ def setup(threads, verbose=False):
                     low=sum(1 for c in known if c < 0.9), n=len(known), unknown=len(cs) - len(known),
                     events=len(notes),
                     worst=min(((getattr(s, "conf", 2), f"{s.rhythm} {s.pitch} {s.lift}") for s in real),
-                              default=(None, ""))[1]))
+                              default=(None, ""))[1],
+                    notes=[note_row(s) for s in seg if s.rhythm.startswith("note")]))
             # a trailing segment with no note may not have become a measure
             while len(rows) > len(measures) and rows and rows[-1]["events"] == 0:
                 rows.pop()
@@ -380,11 +389,13 @@ class OnnxStaff2Score:
         symbols, probs = self.reader.predict(x)
         STAFF_SECONDS.append(round(time.perf_counter() - t0, 3))
         raw = []
-        for s, (r, p, l) in zip(symbols, probs):
+        for s, (r, p, l, lifts) in zip(symbols, probs):
             e = self.h.EncodedSymbol(*s)
             e.conf = min(r, p, l) if e.rhythm.startswith("note") else r
             if e.rhythm.startswith("note") and e.lift in SIGNS:
                 e.sign = l   # how sure the model is of the sign it chose for this note
+            if e.rhythm.startswith("note"):
+                e.lifts = lifts   # the lift branch's distribution (conf.json "notes")
             raw.append(e)
         out = self.h.collapse_keys(raw)
         STAFF_KEYS.append(next((o.rhythm for o in out if o.rhythm.startswith("keySignature_")), None))
@@ -445,5 +456,6 @@ def bar_rows(xml_path, conf):
                         minSignProb=row.get("sign"), addsUp=adds_up(fit, i),
                         events=row.get("events"), worst=row.get("worst"),
                         startsStaff=i == 0 or new_system,
-                        length=str(got), expected=None if exp is None else str(exp)))
+                        length=str(got), expected=None if exp is None else str(exp),
+                        notes=row.get("notes")))
     return out

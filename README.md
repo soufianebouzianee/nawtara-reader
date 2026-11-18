@@ -101,6 +101,16 @@ Written into `OUT_DIR`:
   the same lower figure as the last (3/4 after 4/4) has `inFile` false: it is
   not in `page.musicxml`, but it was seen there. `signatures` is null when
   the signatures could not be placed on bars.
+  `notes` (from 0.5.0, on each row of `bars`): the bar's notes in reading
+  order, chord notes included: `pitch` (as `A4`), `lift` (the alteration the
+  model chose: `_` none, `N` natural, `b`, `#`, `bb`, `##`, `qb` half-flat,
+  `q#` half-sharp; the sounding one, the key's included), `p` (its
+  probability) and `alts` (every other lift given at least 0.005). A note
+  written back to the key's value after its bar altered that letter, with
+  `p` low and the bar's value among `alts`, is often an accidental the model
+  forgot to carry to the barline. Null when the model's bars could not be
+  matched to the file's measures (like `minProb`). A bar may list a note the
+  writer left out of `page.musicxml`. `page.musicxml` does not change.
 - `layout.json`: where each bar is on the image. `page` is the image's size in
   pixels, upright (EXIF orientation applied). `staves`: each staff read, with
   its `box` `[x0, y0, x1, y1]` in those pixels and the bars on it. `bars`: one

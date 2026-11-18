@@ -131,3 +131,7 @@ imported homr modules. homr's files are not edited. Checked against the code.
     kept and marked instead of removed. The bars of that copy are counted
     the way homr's writer counts them, and every time signature of part 1 is
     reported in conf.json (`signatures`). page.musicxml does not change.
+16. Per-note lift distribution (0.5.0): the staff reader's decode loop also
+    keeps the softmax of the lift branch at each step (classes under 0.005
+    left out); the choice is still its arg max. conf.json lists it per note
+    of part 1 (`bars[].notes`). page.musicxml does not change.

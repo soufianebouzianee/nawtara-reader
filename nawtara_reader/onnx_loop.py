@@ -4,7 +4,7 @@ homr's own loop (homr/transformer/decoder_inference.py) hands the
 decoder one context token at every later step and drifts on this model: do not use it.
 
 Added here: the probability of the chosen class of the rhythm, pitch and lift branches at each step
-(the confidence figures written to conf.json).
+(the confidence figures written to conf.json), and the lift branch's whole distribution (0.5.0).
 """
 import numpy as np
 import onnxruntime as ort
@@ -16,6 +16,17 @@ def _top_prob(logits):
     v = v - v.max()
     e = np.exp(v)
     return float(e.max() / e.sum())
+
+
+# A lift class under this probability is left out of a note's distribution (conf.json "notes").
+LIFT_FLOOR = 0.005
+
+
+def _softmax(logits):
+    v = logits.astype(np.float32)
+    v = v - v.max()
+    e = np.exp(v)
+    return e / e.sum()
 
 
 class OnnxStaffReader:
@@ -44,7 +55,8 @@ class OnnxStaffReader:
     def predict(self, x):
         """x: float32 [1, 1, H, W]. Returns (symbols, probs): symbols are
         (rhythm, pitch, lift, articulation, slur, position) names, probs the (rhythm, pitch, lift)
-        probabilities of the chosen classes, one per symbol."""
+        probabilities of the chosen classes, one per symbol, then the lift branch's distribution
+        ({lift name: probability}, classes under LIFT_FLOOR left out). The choice is unchanged."""
         cfg = self.cfg
         context = self.encode(x)
         empty = context[:, :0]
@@ -78,5 +90,7 @@ class OnnxStaffReader:
             inv = self.inv
             out.append((inv["rhythm"][am[0]], inv["pitch"][am[1]], inv["lift"][am[2]],
                         inv["articulation"][am[4]], inv["slur"][am[5]], inv["position"][am[3]]))
-            probs.append((_top_prob(last[0]), _top_prob(last[1]), _top_prob(last[2])))
+            lifts = _softmax(last[2])
+            dist = {inv["lift"][i]: float(v) for i, v in enumerate(lifts) if v >= LIFT_FLOOR}
+            probs.append((_top_prob(last[0]), _top_prob(last[1]), _top_prob(last[2]), dist))
         return out, probs
