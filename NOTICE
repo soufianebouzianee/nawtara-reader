@@ -41,9 +41,8 @@ What is not in this repository
 ------------------------------
 
 The trained staff model: `encoder.onnx` and `decoder_fused.onnx`. It is our own
-model, trained from the public timm ImageNet-pretrained encoder and a blank
-decoder, not from homr's transformer weights. The files are not published
-here. The command needs them: give the folder holding them in the environment
+model and does not contain homr's transformer weights. The files are not
+published here. The command needs them: give the folder holding them in the environment
 variable NAWTARA_READER_MODELS (or with --models, or --encoder and --decoder).
 Without them the command stops with exit code 2.
 
@@ -72,10 +71,7 @@ imported homr modules. homr's files are not edited. Checked against the code.
     `keySign` token counts as having a staff position.
  2. The staff reader: homr's `Staff2Score` model call is replaced
     (`cli.py` sets `SPT.inference`) by `OnnxStaffReader`, which runs the model
-    on onnxruntime with greedy decoding and passes an EMPTY context after the
-    first step. homr's own loop passes one context token each step and gives
-    wrong readings with this model. The input is the staff image normalised
-    with mean 0.7931 and standard deviation 0.1738.
+    on onnxruntime.
  3. Confidence: for each chosen symbol the probability of the top class of the
     rhythm, pitch and lift outputs is kept (the minimum of the three for notes,
     the rhythm probability otherwise). For a note that carries an accidental
@@ -91,11 +87,8 @@ imported homr modules. homr's files are not edited. Checked against the code.
     part 1, the lowest symbol probability. This does not change the MusicXML.
  7. Staff pairs (default `--staves top`): where homr's cutter joins a braced
     or bracketed pair of staves (`Staff.merge`, `find_braces_brackets_and_grand_staff_lines`
-    are wrapped), only the UPPER staff is given to the model. On a page where
-    the number of joined pairs is at least half the number of single staves, two
-    neighbouring single staves whose gap is no wider than 1.15 times the widest
-    gap inside a joined pair are treated as a pair and their upper staff is
-    read. With `--staves merge` homr's own joining is used instead.
+    are wrapped), only the UPPER staff is given to the model. On some pages two
+    neighbouring single staves are also treated as a pair. With `--staves merge` homr's own joining is used instead.
  8. Threads: onnxruntime sessions that homr opens without options (its
     segmentation net) get the thread count given with --threads (default 2),
     and so do OpenCV and the OMP/OpenBLAS/MKL/Accelerate thread variables.

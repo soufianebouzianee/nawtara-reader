@@ -105,10 +105,7 @@ Written into `OUT_DIR`:
   order, chord notes included: `pitch` (as `A4`), `lift` (the alteration the
   model chose: `_` none, `N` natural, `b`, `#`, `bb`, `##`, `qb` half-flat,
   `q#` half-sharp; the sounding one, the key's included), `p` (its
-  probability) and `alts` (every other lift given at least 0.005). A note
-  written back to the key's value after its bar altered that letter, with
-  `p` low and the bar's value among `alts`, is often an accidental the model
-  forgot to carry to the barline. Null when the model's bars could not be
+  probability) and `alts` (every other lift given at least 0.005). Null when the model's bars could not be
   matched to the file's measures (like `minProb`). A bar may list a note the
   writer left out of `page.musicxml`. `page.musicxml` does not change.
 - `layout.json`: where each bar is on the image. `page` is the image's size in

@@ -1,4 +1,4 @@
-# nawtara-reader runtime (same versions as the research venv, so readings are identical)
+# nawtara-reader runtime
 numpy==2.4.6
 opencv-python-headless==5.0.0.93
 Pillow==13.0.0
