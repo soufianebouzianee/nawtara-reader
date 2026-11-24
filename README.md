@@ -127,6 +127,13 @@ half is a natural E. Do not apply the key signature to bare notes again. A
 start-repeat sign closes the bar it is met in, so a staff that begins with one
 has an empty bar in front.
 
+## Small music on a wide image
+
+From 0.5.1, a one-line strip or a page whose music is small for the image's
+width (wide margins, two pages side by side, a screen capture) is padded or
+scaled before homr looks for staves, so its staff spacing reaches about 20 px
+at the net. Other images are read as before (NOTICE, item 17).
+
 ## Licence
 
 GNU Affero General Public License v3.0 (`LICENSE`), because it contains homr,

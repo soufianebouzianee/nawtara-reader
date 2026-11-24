@@ -128,3 +128,9 @@ imported homr modules. homr's files are not edited. Checked against the code.
     keeps the softmax of the lift branch at each step (classes under 0.005
     left out); the choice is still its arg max. conf.json lists it per note
     of part 1 (`bars[].notes`). page.musicxml does not change.
+17. Page scale (0.5.1): before homr's segmentation, an image whose height is
+    under a quarter of its width gets a white margin (one image height above
+    and below, 5 % at the sides), and an image whose staff spacing would fall
+    under 12 px at homr's 1920 px width is resized so it is 20 px instead (at
+    most 6000 px wide). Other images go through homr's resize unchanged
+    (`nawtara_reader/page_scale.py`, installed from page.setup()).

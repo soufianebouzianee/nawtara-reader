@@ -37,7 +37,7 @@ import threading
 import time
 from pathlib import Path
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 

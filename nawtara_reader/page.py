@@ -84,6 +84,7 @@ def setup(threads, verbose=False):
     import homr.download_utils as DU
     DU.download_file = _blocked
     import homr.main as M
+    from . import page_scale; page_scale.install(M)
     import homr.model as HM
     import homr.brace_dot_detection as BD
     import homr.music_xml_generator as G
