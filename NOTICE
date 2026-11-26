@@ -134,3 +134,10 @@ imported homr modules. homr's files are not edited. Checked against the code.
     under 12 px at homr's 1920 px width is resized so it is 20 px instead (at
     most 6000 px wide). Other images go through homr's resize unchanged
     (`nawtara_reader/page_scale.py`, installed from page.setup()).
+18. Staff window (0.5.2): homr cuts each staff between the staff above and
+    the staff below (`staff_parsing._calculate_region`, wrapped). When two
+    staves it found overlap, that window could close to a pixel and the page
+    stopped in OpenCV's resize. The window now always keeps the staff's own
+    lines plus one staff space above and below; a window that already does
+    is unchanged (`nawtara_reader/staff_region.py`, installed from
+    page.setup()).

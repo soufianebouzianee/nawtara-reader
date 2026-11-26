@@ -134,6 +134,9 @@ width (wide margins, two pages side by side, a screen capture) is padded or
 scaled before homr looks for staves, so its staff spacing reaches about 20 px
 at the net. Other images are read as before (NOTICE, item 17).
 
+From 0.5.2, a page where homr finds two staves that overlap is read instead of
+stopping with an OpenCV resize error (NOTICE, item 18).
+
 ## Licence
 
 GNU Affero General Public License v3.0 (`LICENSE`), because it contains homr,

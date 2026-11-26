@@ -198,6 +198,7 @@ def setup(threads, verbose=False):
 
     # ---- every time signature read, the repeated ones too --------------------------------------
     import homr.staff_parsing as SP
+    from . import staff_region; staff_region.install(SP)
     _dedup = SP.remove_duplicated_symbols
     def remove_duplicated_symbols(symbols, cleanup_tuplets=True):
         copied = copy.deepcopy(symbols)   # before homr's pass: it may change symbols in place
