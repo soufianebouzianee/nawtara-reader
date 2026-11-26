@@ -137,6 +137,11 @@ at the net. Other images are read as before (NOTICE, item 17).
 From 0.5.2, a page where homr finds two staves that overlap is read instead of
 stopping with an OpenCV resize error (NOTICE, item 18).
 
+From 0.5.3, the dark bands of a phone screenshot (a sheet shown in a dark app,
+with the status bar above and the app's buttons below) are cut off before the
+page is read; boxes in `layout.json` are still on the image you gave
+(NOTICE, item 19).
+
 ## Licence
 
 GNU Affero General Public License v3.0 (`LICENSE`), because it contains homr,

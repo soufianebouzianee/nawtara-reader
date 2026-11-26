@@ -141,3 +141,11 @@ imported homr modules. homr's files are not edited. Checked against the code.
     lines plus one staff space above and below; a window that already does
     is unchanged (`nawtara_reader/staff_region.py`, installed from
     page.setup()).
+19. Dark borders (0.5.3): after homr's autocrop (`homr.main.autocrop`,
+    wrapped), the dark bands at the edges of the image are cut off: rows,
+    then columns, outside the first and last that are mostly paper (half of
+    them above 180 grey), when such a band is dark (mean under 60), at least
+    3 % of the image, and the page inside it is paper (median above 180).
+    The result is a view of the image, so layout.json maps boxes back to the
+    upload. An image without such a band is unchanged
+    (`nawtara_reader/border_trim.py`, installed from page.setup()).
